@@ -70,8 +70,7 @@ def build_bli_op_blksz_c(file_path, opname, o_types, p_types, dims):
 
 #include "blis.h"
 
-
-// -----------------------------------------------------------------------------
+#ifdef BLIS_ENABLE_LEVEL4
 
 dim_t bli_{opname}_determine_blocksize
      (
@@ -113,6 +112,8 @@ dim_t bli_{opname}_determine_blocksize
 
 	return b_now;
 }}
+
+#endif
 """
 
 def build_bli_op_blksz_h(file_path, opname, o_types, p_types, dims):
@@ -150,6 +151,9 @@ def build_bli_op_blksz_h(file_path, opname, o_types, p_types, dims):
 
 */
 
+#ifndef BLIS_{opname.upper()}_BLKSZ_H
+#define BLIS_{opname.upper()}_BLKSZ_H
+
 dim_t bli_{opname}_determine_blocksize
      (
              dim_t   i,
@@ -158,6 +162,8 @@ dim_t bli_{opname}_determine_blocksize
        const cntx_t* cntx,
              cntl_t* cntl
      );
+
+#endif
 """
 
 """
@@ -203,6 +209,8 @@ def build_bli_op_cntl_c(file_path, opname, o_types, p_types, dims):
 
 #include "blis.h"
 
+#ifdef BLIS_ENABLE_LEVEL4
+
 /*
 // TODO: Change this to include all of your variants
 static {opname}_oft unb_vars[2] = 
@@ -230,8 +238,8 @@ cntl_t* bli_{opname}_cntl_create
 	// else                              uplo = 1;
 
 	// TODO: Specify unblocked and blocked functions
-	{opname}_oft unb_f = NULL;
-	{opname}_oft blk_f = NULL;
+	{opname}_oft unb_fp = NULL;
+	{opname}_oft blk_fp = NULL;
 
 	cntl_t* {opname}_{"x"*np}_leaf = bli_{opname}_cntl_create_node
 		(
@@ -239,7 +247,7 @@ cntl_t* bli_{opname}_cntl_create
 				BLIS_NO_PART,
 				1, 1,
 				2,
-				unb_f,
+				unb_fp,
 				NULL
 		);
 
@@ -249,7 +257,7 @@ cntl_t* bli_{opname}_cntl_create
 				BLIS_NO_PART,
 				1, 1,
 				1,
-				blk_f,
+				blk_fp,
 				{opname}_{"x"*np}_leaf
 		);
 
@@ -259,7 +267,7 @@ cntl_t* bli_{opname}_cntl_create
 			BLIS_NO_PART,
 			1, 1,
 			0,
-			blk_f,
+			blk_fp,
 			{opname}_{"x"*np}_inner
 		);
 
@@ -308,6 +316,8 @@ cntl_t* bli_{opname}_cntl_create_node
 	  sub_node
 	);
 }}
+
+#endif
 """
 
 def build_bli_op_cntl_h(file_path, opname, o_types, p_types, dims):
@@ -347,6 +357,9 @@ def build_bli_op_cntl_h(file_path, opname, o_types, p_types, dims):
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
+
+#ifndef BLIS_{opname.upper()}_CNTL_H
+#define BLIS_{opname.upper()}_CNTL_H
 
 typedef struct
 {{
@@ -391,6 +404,8 @@ cntl_t* bli_{opname}_cntl_create_node
        void_fp var_func,
        cntl_t* sub_node
      );
+
+#endif
 """
 
 """
@@ -497,7 +512,8 @@ def build_bli_op_int_h(file_path, opname, o_types, p_types, dims):
 
 #include "blis.h"
 
-#ifdef BLIS_ENABLE_LEVEL4
+#ifndef BLIS_{opname.upper()}_INT_H
+#define BLIS_{opname.upper()}_INT_H
 
 err_t bli_{opname}_int
      (
@@ -556,6 +572,9 @@ def build_bli_op_var_h(file_path, opname, o_types, p_types, dims):
 
 */
 
+#ifndef BLIS_{opname.upper()}_VAR_H
+#define BLIS_{opname.upper()}_VAR_H
+
 //
 // Prototype object-based interfaces.
 //
@@ -571,7 +590,7 @@ err_t PASTEMAC0(opname) \\
              cntl_t* cntl  \\
      );
 
-// TODO: INSERT INVARIANT NAMES HERE!
+// TODO: INSERT ALL INVARIANT NAMES HERE!
 //GENPROT(  )
 
 //
@@ -599,8 +618,11 @@ err_t PASTEMAC(ch,varname) \\
              rntm_t* rntm  \\
      );
 
-// TODO: INSERT INVARIANT NAMES HERE!
-//INSERT_GENTPROT_BASIC0(  )"""
+// TODO: INSERT OPTIMIZED INVARIANT NAMES HERE!
+//INSERT_GENTPROT_BASIC0(  )
+
+#endif
+"""
 
 """
 bli_<opname>.c and bli_<opname>.h
@@ -744,6 +766,9 @@ def build_bli_op_h(file_path, opname, o_types, p_types, dims):
 
 */
 
+#ifndef BLIS_{opname}_H
+#define BLIS_{opname}_H
+
 #include "bli_{opname}_var.h"
 #include "bli_{opname}_blksz.h"
 #include "bli_{opname}_cntl.h"
@@ -760,4 +785,6 @@ err_t bli_{opname}_ex
 			const cntx_t* cntx,
 			rntm_t* rntm
 		);
+
+#endif
 """

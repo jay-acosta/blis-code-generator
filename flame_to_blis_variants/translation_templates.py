@@ -204,8 +204,11 @@ err_t PASTEMAC(ch,varname) \\
 		ctype*   a00       = a + (0  )*rs_a + (0  )*cs_a; \\
 		ctype*   a01       = a + (0  )*rs_a + (i  )*cs_a; \\
 		ctype*   a02       = a + (0  )*rs_a + (i+1)*cs_a; \\
+		ctype*   a10       = a + (i  )*rs_a + (0  )*cs_a; \\
 		ctype*   alpha11   = a + (i  )*rs_a + (i  )*cs_a; \\
 		ctype*   a12       = a + (i  )*rs_a + (i+1)*cs_a; \\
+		ctype*   a20       = a + (i+1)*rs_a + (0  )*cs_a; \\
+		ctype*   a21       = a + (i+1)*rs_a + (i  )*cs_a; \\
 		ctype*   a22       = a + (i+1)*rs_a + (i+1)*cs_a; \\
 \\
 { loop_body } \\

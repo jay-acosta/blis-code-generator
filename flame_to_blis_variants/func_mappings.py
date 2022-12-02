@@ -35,6 +35,12 @@ TAPI_OPS_MAP["FLA_Invert"] = invertsc_tapi
 # axpbyv
 # axpyv
 # copyv
+# dots
+def dots_oapi(x):
+    # FLA_Dots_external( FLA_MINUS_ONE, a10t, a01, FLA_ONE, alpha11 );
+    return bli_oapi("bli_dotxv_ex", amp(x[0]), amp(x[1]), amp(x[2]), amp(x[3]), amp(x[4]), "cntx", "rntm")
+OAPI_OPS_MAP["FLA_Dots_external"] = dots_oapi
+
 # dotv
 def dotcs_oapi(x):
     # FLA_Dotcs_external( FLA_CONJUGATE, FLA_ONE, a21, a21, FLA_ONE, alpha11 );
