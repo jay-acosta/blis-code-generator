@@ -1,31 +1,56 @@
 import os
 from pathlib import Path
 from os.path import join
-from arch_util import *
+
+from constants import COPYRIGHT_HEADER
+
+from formatters import convert_param_to_name, format_obj_func_args_multiline, format_obj_func_args_inline
+from file_parser import write_func_output_to_file, check_if_string_in_file, insert_line_after_in_file, append_to_file
 
 """
 Build test files
 """
 
-def build_test_files(blis_dir, opname, o_types, p_types, dims):
+def build_test_files(blis_dir, opname, o_types, p_types, dims, num_variants):
 	# build operation directory
 	test_dir = Path(join(blis_dir, "testsuite"))
 	src_dir  = Path(join(test_dir, "src"))
 	
-	repacked_params = (opname, o_types, p_types, dims)
-	
-	write_w_check(join(src_dir, f"test_libblis.c"), build_test_libflame_c, repacked_params)
-	write_w_check(join(src_dir, f"test_libblis.h"), build_test_libflame_h, repacked_params)
-	write_wout_check(join(src_dir, f"test_{opname}.c"), build_test_op_c, repacked_params)
-	write_wout_check(join(src_dir, f"test_{opname}.h"), build_test_op_h, repacked_params)
+	repacked_params = (opname, o_types, p_types, dims, num_variants)
 
-	write_w_check(join(test_dir, f"input.operations"), build_input_operations, repacked_params)
-	write_w_check(join(test_dir, f"input.operations.fast"), build_input_operations, repacked_params)
-	write_w_check(join(test_dir, f"input.operations.mixed"), build_input_operations, repacked_params)
-	write_w_check(join(test_dir, f"input.operations.salt"), build_input_operations, repacked_params)
+	file_names_and_functions = [
+		(join(src_dir, f"test_libblis.c"), build_test_libflame_c),
+		(join(src_dir, f"test_libblis.h"), build_test_libflame_h),
+		(join(test_dir, f"input.operations"), build_input_operations),
+		(join(test_dir, f"input.operations.fast"), build_input_operations),
+		(join(test_dir, f"input.operations.mixed"), build_input_operations),
+		(join(test_dir, f"input.operations.salt"), build_input_operations)
+	]
 
+	for file_name, function in file_names_and_functions:
+		if check_if_string_in_file(file_name, opname):
+			# checked if opname is file
+			print(f"Operation name already exists in {file_name} - skipping for now")
+		elif os.path.exists(file_name):
+			print("Writing " + file_name, end="")
+			write_func_output_to_file(file_name, function, repacked_params)
+			print(" -> Done.")
+		else:
+			print("An error occurred when writing " + file_name)
+			print("Please edit this file before running BLIS...")
 
-def build_input_operations(file_name, opname, o_types, p_types, dims):
+	file_names_and_functions = [
+		(join(src_dir, f"test_{opname}.c"), build_test_op_c),
+		(join(src_dir, f"test_{opname}.h"), build_test_op_h)
+	]
+
+	# write to file without checking if string appears 
+	for file_name, function in file_names_and_functions:
+		print("Writing " + file_name, end="")
+		write_func_output_to_file(file_name, function, repacked_params)
+		print(" -> Done.")
+
+def build_input_operations(file_name, opname, o_types, p_types, dims, num_variants):
     new_op = \
 f"""
 {"1":8s} # {opname}
@@ -35,7 +60,7 @@ f"""
     return append_to_file(file_name, new_op)
 
 
-def build_test_libflame_c(file_name, opname, o_types, p_types, dims):
+def build_test_libflame_c(file_name, opname, o_types, p_types, dims, num_variants):
     return insert_line_after_in_file(file_name, 
         ("libblis_test_chol", 
          "1, &(ops->chol) );"),
@@ -43,52 +68,16 @@ def build_test_libflame_c(file_name, opname, o_types, p_types, dims):
          f"\tlibblis_test_read_op_info( ops, input_stream, BLIS_NOID,  BLIS_TEST_DIMS_{dims.upper()},   {len(p_types)}, &(ops->{opname}) );")
     )
 
-def build_test_libflame_h(file_name, opname, o_types, p_types, dims):
+def build_test_libflame_h(file_name, opname, o_types, p_types, dims, num_variants):
     return insert_line_after_in_file(file_name, 
         ("#include \"test_chol.h\"", "test_op_t chol;"),
         (f"#include \"test_{opname}.h\"", f"\ttest_op_t {opname};")
     )
 
-def build_test_op_c(file_path, opname, o_types, p_types, dims):
+def build_test_op_c(file_path, opname, o_types, p_types, dims, num_variants):
+    obj_func_params_formatter = ", \n       "
 
-    obj_func_params = ", \n       ".join(map(
-		lambda x: f"obj_t*    {x}",
-		convert_obj_to_name(o_types)
-	))
-
-    return f"""/*
-
-   BLIS
-   An object-based framework for developing high-performance BLAS-like
-   libraries.
-
-   Copyright (C) 2014, The University of Texas at Austin
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-    - Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    - Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    - Neither the name(s) of the copyright holder(s) nor the names of its
-      contributors may be used to endorse or promote products derived
-      from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
+    return f"""{COPYRIGHT_HEADER}
 
 #include "blis.h"
 #include "test_libblis.h"
@@ -96,12 +85,12 @@ def build_test_op_c(file_path, opname, o_types, p_types, dims):
 
 // Static variables.
 static char*     op_str                    = "{opname}";
-static char*     o_types                   = "{o_types}";   // a
-static char*     p_types                   = "{p_types}";  // uploa, diaga
-static thresh_t  thresh[BLIS_NUM_FP_TYPES] = {{ {{ 1e-02, 1e-03 }},    // warn, pass for s
-                                                {{ 1e-02, 1e-03 }},    // warn, pass for c
-                                                {{ 1e-11, 1e-12 }},    // warn, pass for d
-                                                {{ 1e-11, 1e-12 }} }}; // warn, pass for z
+static char*     o_types                   = "{o_types}";  // TODO: add description/check here
+static char*     p_types                   = "{p_types}";  // TODO: add description/check here
+static thresh_t  thresh[BLIS_NUM_FP_TYPES] = {{ {{ 1e-02, 1e-03 }},   // warn, pass for s
+                                               {{ 1e-02, 1e-03 }},   // warn, pass for c
+                                               {{ 1e-11, 1e-12 }},   // warn, pass for d
+                                               {{ 1e-11, 1e-12 }} }}; // warn, pass for z
 
 // Local prototypes.
 void libblis_test_{opname}_deps
@@ -126,8 +115,8 @@ void libblis_test_{opname}_experiment
 
 void libblis_test_{opname}_impl
      (
-       iface_t   iface,
-       {obj_func_params}
+       iface_t iface,
+       {format_obj_func_args_multiline(o_types, obj_func_params_formatter)}
      );
 
 void libblis_test_{opname}_check
@@ -245,13 +234,14 @@ void libblis_test_{opname}_experiment
 
 		time = bli_clock();
 
-		// TODO: Insert your operation here!
+		// libblis_test_{opname}_impl( iface, {format_obj_func_args_inline(o_types, ", ")} );
 
 		time_min = bli_clock_min_diff( time_min, time );
 	}}
 
 	// Estimate the performance of the best experiment repeat.
-	*perf = ( ( 1.0 / 4.0 ) * m * m * m ) / time_min / FLOPS_PER_UNIT_PERF;
+	// *perf = ( ( 1.0 / 4.0 ) * m * m * m ) / time_min / FLOPS_PER_UNIT_PERF;
+	*perf = 0;
 	if ( bli_obj_is_complex( &a ) ) *perf *= 4.0;
 
 	// Perform checks.
@@ -269,14 +259,14 @@ void libblis_test_{opname}_experiment
 
 void libblis_test_{opname}_impl
      (
-       iface_t   iface,
-       {obj_func_params}
+       iface_t iface,
+       {format_obj_func_args_multiline(o_types, obj_func_params_formatter)}
      )
 {{
 	switch ( iface )
 	{{
 		case BLIS_TEST_SEQ_FRONT_END:
-		bli_{opname}( a );
+			bli_{opname}( {format_obj_func_args_inline(o_types, ", ")} );
 		break;
 
 		default:
@@ -317,7 +307,7 @@ void libblis_test_{opname}_check
 	//
 	// is negligible, where
 	//
-    //
+	//
 	//
 
 	bli_obj_scalar_init_detached( dt_real, &norm );
@@ -326,40 +316,8 @@ void libblis_test_{opname}_check
 }}
 """
 
-def build_test_op_h(file_path, opname, o_types, p_types, dims):
-    return f"""/*
-
-   BLIS
-   An object-based framework for developing high-performance BLAS-like
-   libraries.
-
-   Copyright (C) 2014, The University of Texas at Austin
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-    - Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    - Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    - Neither the name(s) of the copyright holder(s) nor the names of its
-      contributors may be used to endorse or promote products derived
-      from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
+def build_test_op_h(file_path, opname, o_types, p_types, dims, num_variants):
+    return f"""{COPYRIGHT_HEADER}
 
 void libblis_test_{opname}
      (
