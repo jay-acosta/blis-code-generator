@@ -4,10 +4,7 @@ def write_to_file (path, output):
 
 def write_func_output_to_file(file_name, f, params):
 	c = f(file_name, *params)
-	print(c)
-	# with open(file_name, 'w') as file:
-	# 	file.write(c)
-	# write_to_file(file_name, c)
+	write_to_file(file_name, c)
 
 def check_if_string_in_file(file_name, string):
 	with open(file_name) as file:
