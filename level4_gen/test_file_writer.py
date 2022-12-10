@@ -4,7 +4,7 @@ from os.path import join
 
 from constants import COPYRIGHT_HEADER
 
-from formatters import convert_param_to_name, format_obj_func_args_multiline, format_obj_func_args_inline
+from formatters import parameters_to_struct_names, format_obj_func_args, format_obj_func_call_args
 from file_parser import write_func_output_to_file, check_if_string_in_file, insert_line_after_in_file, append_to_file
 
 """
@@ -55,14 +55,14 @@ def build_input_operations(file_name, opname, o_types, p_types, dims, num_varian
 f"""
 {"1":8s} # {opname}
 {" ".join(["-1"] * len(dims)):8s} #   dimensions: {" ".join([*dims])}
-{"?"*len(p_types):8s} #   parameters: {" ".join(list(convert_param_to_name(p_types)))}
+{"?"*len(p_types):8s} #   parameters: {" ".join(list(parameters_to_struct_names(p_types)))}
 """
     return append_to_file(file_name, new_op)
 
 
 def build_test_libflame_c(file_name, opname, o_types, p_types, dims, num_variants):
     return insert_line_after_in_file(file_name, 
-        ("libblis_test_chol", 
+        ("params, &(ops->chol) );", 
          "1, &(ops->chol) );"),
         (f"\tlibblis_test_{opname}( tdata, params, &(ops->{opname}) );", 
          f"\tlibblis_test_read_op_info( ops, input_stream, BLIS_NOID,  BLIS_TEST_DIMS_{dims.upper()},   {len(p_types)}, &(ops->{opname}) );")
@@ -70,7 +70,7 @@ def build_test_libflame_c(file_name, opname, o_types, p_types, dims, num_variant
 
 def build_test_libflame_h(file_name, opname, o_types, p_types, dims, num_variants):
     return insert_line_after_in_file(file_name, 
-        ("#include \"test_chol.h\"", "test_op_t chol;"),
+        ("#include \"test_chol.h\"",       "test_op_t chol;"),
         (f"#include \"test_{opname}.h\"", f"\ttest_op_t {opname};")
     )
 
@@ -116,7 +116,7 @@ void libblis_test_{opname}_experiment
 void libblis_test_{opname}_impl
      (
        iface_t iface,
-       {format_obj_func_args_multiline(o_types, obj_func_params_formatter)}
+       {format_obj_func_args(o_types, obj_func_params_formatter)}
      );
 
 void libblis_test_{opname}_check
@@ -234,7 +234,7 @@ void libblis_test_{opname}_experiment
 
 		time = bli_clock();
 
-		// libblis_test_{opname}_impl( iface, {format_obj_func_args_inline(o_types, ", ")} );
+		// libblis_test_{opname}_impl( iface, {format_obj_func_call_args(o_types, ", ")} );
 
 		time_min = bli_clock_min_diff( time_min, time );
 	}}
@@ -260,13 +260,13 @@ void libblis_test_{opname}_experiment
 void libblis_test_{opname}_impl
      (
        iface_t iface,
-       {format_obj_func_args_multiline(o_types, obj_func_params_formatter)}
+       {format_obj_func_args(o_types, obj_func_params_formatter)}
      )
 {{
 	switch ( iface )
 	{{
 		case BLIS_TEST_SEQ_FRONT_END:
-			bli_{opname}( {format_obj_func_args_inline(o_types, ", ")} );
+			bli_{opname}( {format_obj_func_call_args(o_types, ", ")} );
 		break;
 
 		default:

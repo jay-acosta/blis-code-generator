@@ -48,5 +48,3 @@ f"""/*
 
 */
 """
-
-COPYRIGHT_HEADER = ""

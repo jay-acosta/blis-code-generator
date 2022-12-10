@@ -139,7 +139,7 @@ static {opname}_oft blk_vars{"[2]"*np} =
 
 cntl_t* bli_{opname}_cntl_create
      (
-       {cntl_create_arguments_with_a(p_types, arg_formatter)},
+       {cntl_create_func_args_with_a(p_types, arg_formatter)},
        rntm_t* rntm
      )
 {{
@@ -264,7 +264,7 @@ BLIS_INLINE dim_t bli_{opname}_params_depth( const {opname}_params_t* params )
 
 // -----------------------------------------------------------------------------
 
-cntl_t* bli_{opname}_cntl_create( {cntl_create_arguments(p_types, ", ")}, rntm_t* rntm );
+cntl_t* bli_{opname}_cntl_create( {cntl_create_args(p_types, ", ")}, rntm_t* rntm );
 
 // -----------------------------------------------------------------------------
 
@@ -300,7 +300,7 @@ f"""{COPYRIGHT_HEADER}
 
 err_t bli_{opname}_int
      (
-             {format_obj_func_args_multiline(o_types, multiline_formatter)},
+             {format_obj_func_args(o_types, multiline_formatter)},
        const cntx_t* cntx,
              rntm_t* rntm,
              cntl_t* cntl
@@ -308,7 +308,7 @@ err_t bli_{opname}_int
 {{
 	{opname}_oft {opname}_fp = bli_cntl_var_func( cntl );
 
-	return {opname}_fp( {format_obj_func_args_inline(o_types, ", ")}, cntx, rntm, cntl );
+	return {opname}_fp( {format_obj_func_call_args(o_types, ", ")}, cntx, rntm, cntl );
 }}
 
 #endif
@@ -326,7 +326,7 @@ f"""{COPYRIGHT_HEADER}
 
 err_t bli_{opname}_int
      (
-             {format_obj_func_args_multiline(o_types, arg_formatter)},
+             {format_obj_func_args(o_types, arg_formatter)},
        const cntx_t* cntx,
              rntm_t* rntm,
              cntl_t* cntl
@@ -356,7 +356,7 @@ f"""{COPYRIGHT_HEADER}
 \\
 err_t PASTEMAC0(opname) \\
      ( \\
-             {format_obj_func_args_multiline(o_types, obj_func_args_formatter)}, \\
+             {format_obj_func_args(o_types, obj_func_args_formatter)}, \\
        const cntx_t* cntx, \\
              rntm_t* rntm, \\
              cntl_t* cntl  \\
@@ -374,7 +374,7 @@ err_t PASTEMAC0(opname) \\
 \\
 err_t PASTEMAC(ch,varname) \\
      ( \\
-             {format_type_func_args_multiline(o_types, p_types, dims, multiline_formatter)}
+             {format_type_func_args(o_types, p_types, dims, multiline_formatter)}
        const cntx_t* cntx, \\
              rntm_t* rntm  \\
      );
@@ -389,10 +389,7 @@ err_t PASTEMAC(ch,varname) \\
 bli_<opname>.c and bli_<opname>.h
 """
 def build_bli_op_c(file_path, opname, o_types, p_types, dims, num_vars):
-	obj_func_params_multiline = format_obj_func_params(o_types, ",\n       ")
 	multiline_formatter = ",\n       "
-
-	params_struc = list(convert_param_to_name(p_types))
 
 	return \
 f"""{COPYRIGHT_HEADER}
@@ -402,15 +399,15 @@ f"""{COPYRIGHT_HEADER}
 
 err_t bli_{opname}
      (
-       {format_obj_func_params(o_types, multiline_formatter)}
+       {format_obj_func_args(o_types, multiline_formatter)}
      )
 {{
-	return bli_{opname}_ex( {format_obj_func_args_inline(o_types, ", ")}, NULL, NULL );
+	return bli_{opname}_ex( {format_obj_func_call_args(o_types, ", ")}, NULL, NULL );
 }}
 
 err_t bli_{opname}_ex
      (
-       {format_obj_func_params(o_types, multiline_formatter)},
+       {format_obj_func_args(o_types, multiline_formatter)},
        const cntx_t* cntx,
              rntm_t* rntm
      )
@@ -418,7 +415,7 @@ err_t bli_{opname}_ex
 	bli_init_once();
 
 	if ( bli_error_checking_is_enabled() )
-		bli_{opname}_check( {format_obj_func_args_inline(o_types, ", ")}, cntx );
+		bli_{opname}_check( {format_obj_func_call_args(o_types, ", ")}, cntx );
 
 	// If necessary, obtain a valid context from the gks using the induced
 	// method id determined above.
@@ -433,14 +430,14 @@ err_t bli_{opname}_ex
 	// TODO: CHOOSE CORRECT PARAMETERS HERE
 	{f"{NL}{TB}".join(map(
 		lambda x: f"const {x}_t {x}a = bli_obj_{x}( a );",
-		params_struc
+		parameters_to_struct_names(p_types)
 	))}
 
 	// Create a control tree for the parameters encoded in A.
-	cntl_t* cntl = bli_{opname}_cntl_create( {parameter_arguments_with_a(p_types, ", ")}, rntm );
+	cntl_t* cntl = bli_{opname}_cntl_create( {cntl_create_call_args_with_a(p_types, ", ")}, rntm );
 
 	// Pass the control tree into the internal back-end.
-	err_t r_val = bli_{opname}_int( {format_obj_func_args_inline(o_types, ", ")}, cntx, rntm, cntl );
+	err_t r_val = bli_{opname}_int( {format_obj_func_call_args(o_types, ", ")}, cntx, rntm, cntl );
 
 	// Free the control tree.
 	bli_{opname}_cntl_free( rntm, cntl, NULL );
@@ -466,12 +463,12 @@ f"""{COPYRIGHT_HEADER}
 
 err_t bli_{opname}
      (
-        {format_obj_func_params(o_types, multiline_formatter)}
+        {format_obj_func_args(o_types, multiline_formatter)}
      );
 
 err_t bli_{opname}_ex
      (
-        {format_obj_func_params(o_types, multiline_formatter)},
+        {format_obj_func_args(o_types, multiline_formatter)},
         const cntx_t* cntx,
         rntm_t* rntm
      );

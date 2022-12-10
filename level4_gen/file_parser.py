@@ -1,3 +1,7 @@
+def read_file(path):
+	with open(path, 'r') as f:
+		return f.read()
+
 def write_to_file (path, output):
 	with open(path, 'w') as f:
 		f.write(output)
@@ -14,27 +18,24 @@ def append_to_file(file_name, new_line):
 	with open(file_name , "r") as file:
 		return "".join(file.readlines()) + new_line
 
-def insert_line_after_in_file(read_file_name, conditions, new_lines):
-	combined_replacement = list(zip(conditions, new_lines))
-	def replace_line(line):
-		for cond, repl in combined_replacement:
-			if cond in line:
-				return f"{line}{repl}\n"
-		return line
+def insert_into_file(replace_function, file_path):
+	with open(file_path, "r+") as rfile:
+		return "".join(map(replace_function, rfile.readlines()))
 
-	with open(read_file_name, "r+") as rfile:
-		return "".join([
-			replace_line(line)
-			for line in rfile.readlines() 
-		])
+def insert_line_after_in_file(file_path, conditions, new_lines):
+	output = read_file(file_path)
 
-def insert_line_before_in_file(read_file_name, conditions, new_lines):
-	combined_replacement = list(zip(conditions, new_lines))
-	def replace_line(line):
-		for cond, repl in combined_replacement:
-			if cond in line:
-				return f"{repl}{line}\n"
-		return line
+	# only replace the last line
+	for condition, replacement in zip(conditions, new_lines):
+		output = f"{condition}\n{replacement}".join(output.rsplit(condition, 1))
 
-	with open(read_file_name, "r+") as rfile:
-		return "".join(map(replace_line, rfile.readlines()))
+	return output
+
+def insert_line_before_in_file(file_path, conditions, new_lines):
+	output = read_file(file_path)
+
+	# only replace the last
+	for condition, replacement in zip(conditions, new_lines):
+		output = f"{replacement}{condition}\n".join(output.rsplit(condition, 1))
+
+	return output

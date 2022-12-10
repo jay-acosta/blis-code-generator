@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import argparse as ap
@@ -15,11 +14,11 @@ def main(args):
 	blis_path = Path(args.blis_directory).expanduser()
 
 	print("Creating operation files")
-	# write_operation_files(blis_path, *params)
+	write_operation_files(blis_path, *params)
 	print()
 
 	print("Adding operation to level 4")
-	# build_level_files(blis_path, *params)
+	build_level_files(blis_path, *params)
 	print()
 
 	print("Creating test files")

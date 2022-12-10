@@ -49,7 +49,7 @@ def build_l4_check_c(file_path, opname, o_types, p_types, dims, num_variants):
 f"""
 void bli_{opname}_check
      (
-             {format_obj_func_args_multiline(o_types, obj_func_formatter)},
+             {format_obj_func_args(o_types, obj_func_formatter)},
        const cntx_t* cntx
      )
 {{
@@ -71,7 +71,7 @@ def build_l4_check_h(file_path, opname, o_types, p_types, dims, num_variants):
 f"""
 void bli_{opname}_check
      (
-             {format_obj_func_args_multiline(o_types, obj_func_formatter)},
+             {format_obj_func_args(o_types, obj_func_formatter)},
        const cntx_t* cntx
      );
 """
@@ -118,7 +118,7 @@ PASTEMAC(varname,_qfp)( num_t dt );
 
 	return insert_line_before_in_file(file_path,
 		("#endif",),
-		(output,) 
+		(output,)
 	)
 
 def build_l4_ft_opt_h(file_path, opname, o_types, p_types, dims, num_variants):
@@ -133,7 +133,7 @@ f"""
 \\
 typedef err_t (*PASTECH3(ch,opname,_opt,tsuf)) \\
      ( \\
-             {format_type_func_args_multiline(o_types, p_types, dims, format_type_args)}
+             {format_type_func_args(o_types, p_types, dims, format_type_args)}
        const cntx_t* cntx, \\
              rntm_t* rntm  \\
      );
@@ -157,7 +157,7 @@ f"""
 \\
 typedef err_t (*PASTECH2(ch,opname,tsuf)) \\
      ( \\
-             {format_type_func_args_multiline(o_types, p_types, dims, type_func_args_formatter)}
+             {format_type_func_args(o_types, p_types, dims, type_func_args_formatter)}
        const cntx_t* cntx, \\
              rntm_t* rntm  \\
      );
@@ -180,7 +180,7 @@ f"""// {opname}
 \\
 typedef err_t (*PASTECH(opname,_oft)) \\
 ( \\
-             {format_obj_func_args_multiline(o_types, obj_arg_formatter)}, \\
+             {format_obj_func_args(o_types, obj_arg_formatter)}, \\
        const cntx_t* cntx, \\
              rntm_t* rntm, \\
              cntl_t* cntl  \\
