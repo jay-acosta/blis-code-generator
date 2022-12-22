@@ -1,2 +1,5 @@
 # ignore any in files
 *.in
+
+# ignore the default output directory
+output

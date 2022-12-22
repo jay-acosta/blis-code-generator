@@ -2,6 +2,7 @@ from re import sub
 from file_io import read_file
 from flame_parser import *
 from format_code_sections import *
+from constants import COPYRIGHT_HEADER
 
 def translate_flame_to_blis_oapi_file(input_file):
     input_content = read_file(input_file)
@@ -19,39 +20,7 @@ def translate_flame_to_blis_oapi_file(input_file):
     loop_conditional = format_loop_conditional(ftype, input_content)
 
     return \
-f"""/*
-
-   BLIS
-   An object-based framework for developing high-performance BLAS-like
-   libraries.
-
-   Copyright (C) 2022, The University of Texas at Austin
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-    - Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    - Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    - Neither the name(s) of the copyright holder(s) nor the names of its
-      contributors may be used to endorse or promote products derived
-      from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
+f"""{COPYRIGHT_HEADER}
 
 #include "blis.h"
 
@@ -68,15 +37,11 @@ err_t {func_name}
 	const dim_t m = bli_obj_length( a );
 	{partitions}
 	{define_b_alg}
-
 	for ( {loop_conditional} )
 	{{
 		{calc_b_alg}
 		{repartitions}
-		/*------------------------------------------------------------*/
 		{loop_body}
-		/*------------------------------------------------------------*/
-
 	}}
 
 	return BLIS_SUCCESS;
@@ -104,39 +69,7 @@ def translate_flame_to_blis_tapi_file(input_file):
     # loop_conditional = format_loop_conditional(ftype, input_content)
 
     return \
-f"""/*
-
-   BLIS
-   An object-based framework for developing high-performance BLAS-like
-   libraries.
-
-   Copyright (C) 2022, The University of Texas at Austin
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-    - Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    - Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    - Neither the name(s) of the copyright holder(s) nor the names of its
-      contributors may be used to endorse or promote products derived
-      from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
+f"""{COPYRIGHT_HEADER}
 
 #include "blis.h"
 
@@ -196,10 +129,17 @@ err_t PASTEMAC(ch,varname) \\
      ) \\
 {{ \\
 \\
+	const ctype one       = *PASTEMAC(ch,1); \\
+	const ctype minus_one = *PASTEMAC(ch,m1); \\
+\\
 	for ( dim_t i = 0; i < m; ++i ) \\
 	{{ \\
 		const dim_t mn_behind = i; \\
 		const dim_t mn_ahead  = m - i - 1; \\
+\\
+		/* Identify subpartitions: /  a00  a01      a02  \\
+		                           |  a10  alpha11  a12  |
+		                           \  a20  a21      a22  / */ \\
 \\
 		ctype*   a00       = a + (0  )*rs_a + (0  )*cs_a; \\
 		ctype*   a01       = a + (0  )*rs_a + (i  )*cs_a; \\
@@ -211,7 +151,7 @@ err_t PASTEMAC(ch,varname) \\
 		ctype*   a21       = a + (i+1)*rs_a + (i  )*cs_a; \\
 		ctype*   a22       = a + (i+1)*rs_a + (i+1)*cs_a; \\
 \\
-{ loop_body } \\
+{ loop_body }\\
 	}} \\
 \\
 	return BLIS_SUCCESS; \\

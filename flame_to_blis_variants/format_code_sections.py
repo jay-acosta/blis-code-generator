@@ -18,11 +18,14 @@ def format_partition_step(ftype, input_file, update_statements):
 
     for arg in partitions:
         m = [x.lower().strip("t") for x in split("[ ,;]+", arg)]
+
+        width = len(m[9]) + 1
+
         partition_strs += [
 f"""
-	obj_t {m[3]}, {m[4]}, {m[5]};
-	obj_t {m[8]}, {m[9]}, {m[10]};
-	obj_t {m[11]}, {m[12]}, {m[13]};
+	obj_t {m[3]}, {m[4]+",":<{width}s} {m[5]};
+	obj_t {m[8]}, {m[9]+",":<{width}s} {m[10]};
+	obj_t {m[11]}, {m[12]+",":<{width}s} {m[13]};
 """
         ]
 
@@ -39,12 +42,14 @@ def format_repartition_step(ftype, input_file, update_statements):
     for arg in partitions:
         m = [x.lower().strip("t") for x in split("[ ,;]+", arg)]
 
+        width = len(m[9]) + 1
+
         repartition_strs += [
 f"""
 		bli_acquire_mparts_tl2br( ij, {"b_alg" if ftype == "blk" else "1"}, {m[3][0]},
-		                          &{m[3] }, &{m[4] }, &{m[5] },
-		                          &{m[8] }, &{m[9] }, &{m[10]},
-		                          &{m[11]}, &{m[12]}, &{m[13]} );
+		                          &{m[3] }, &{m[4]+",":<{width}s} &{m[5] },
+		                          &{m[8] }, &{m[9]+",":<{width}s} &{m[10]},
+		                          &{m[11]}, &{m[12]+",":<{width}s} &{m[13]} );
 """
         ]
 
@@ -68,8 +73,21 @@ def format_loop_conditional(ftype, file_input):
     else:
         return f"dim_t ij = 0; ij < m; ij += {blk_size}"
 
+def _format_optimized_loop_body(update_statements):
+    output = ""
+    for statement in update_statements:
+        if statement:
+            output += f"{TB}{TB}{statement} \\\n"
+        else:
+            output += "\\\n"
+
+    return output
+
+def _format_object_loop_body(update_statements):
+    return "\n\t\t".join(update_statements)
+
 def format_loop_body(ftype, update_statements):
-    if ftype == "opt":
-        return f" {BS}{NL}{TB}{TB}".join(update_statements)
-    else:
-        return f"{NL}{TB}{TB}".join(update_statements)
+    return \
+        _format_optimized_loop_body(update_statements) \
+        if ftype == "opt" else \
+        _format_object_loop_body(update_statements)

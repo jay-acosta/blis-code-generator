@@ -56,7 +56,7 @@ def translate_flame_updates_to_blis(ftype, file_input):
     file_input = split("/\*-+\*/", file_input)
     if len(file_input) != 3:
         return None
-    file_input = file_input[1]
+    file_input = file_input[1].strip()
 
     update_statements = []
     flame_statements = file_input.split("\n")

@@ -67,9 +67,43 @@ def main(args):
         print()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument("--output_dir", "-o", default="output")
+    description = """
+    Translates code from the FLAMEC API to the BLIS API. This translator has the ability to translate both
+    variants for the BLIS Object API and BLIS Typed API. Translation is done by specifying a file path to
+    a FLAMEC file. The generator will attempt to translate the FLAMEC API to BLIS API, leaving any comments
+    for any unknown or untranslated function calls. These translated files will be output to a directory
+    'output' or a specified directory through the -o argument.
+    """
+
+    example = """
+Example code input:
+
+    If you need a batch of operations to translate, you can do so by piping a file into stdin
+    python3 main.py -o test < ttmm_ops.in
+
+    If you would like to enter the program manually, you can do so through...
+
+    python3 main.py
+    Writing output to output
+    Input a file to translate: <input a file path here>
+    ...
+
+    To escape the interactive session, press enter when asked to input a file.
+"""
+
+    parser = argparse.ArgumentParser(
+        description=description, 
+        epilog=example,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    parser.add_argument(
+        "--output_dir", 
+        "-o", 
+        default="output", 
+        help="This optional parameter can be used to specify the output directory for all files generated."
+    )
 
     args = parser.parse_args()
 

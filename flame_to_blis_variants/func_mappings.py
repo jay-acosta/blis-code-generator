@@ -147,7 +147,8 @@ def trsv_oapi(x):
 OAPI_OPS_MAP["FLA_Trsv_external"] = trsv_oapi
 
 def trsv_tapi(x):
-    return bli_tapi("trsv", "FLA_NO_CONJUGATE", size(x[1]), x[0], x[1], "cntx", "rntm")
+    # void bli_?trsv (uploa, transa, diaga, m, alpha, a, inc_t rsa, inc_t csa, y, inc_t incy );
+    return bli_tapi("trsv", x[0], x[1], x[2], size(x[3]), "&FLA_ONE", x[3], x[4], "cntx", "rntm")
 TAPI_OPS_MAP["FLA_Trsv_external"] = trsv_tapi
 
 # --- Level-3 --------------------------------------------------------------
