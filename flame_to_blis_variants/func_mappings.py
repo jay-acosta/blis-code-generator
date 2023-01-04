@@ -1,225 +1,325 @@
-from api_translators import *
 from constants import amp, size
 
-"""
-To add a new operation, add a custom function mapping for the OAPI and TAPI
+class Translator(object):
+    def __call__(self, statement: str, args):
+        return self[statement](args)
 
-After making the function, put it in the map
-"""
+    def __getitem__(self, statement: str):
+        if hasattr(self, statement):
+            return getattr(self, statement)
+        else:
+            raise KeyError(f"Mapping for statement '{statement}' not found.")
 
-OAPI_OPS_MAP = {}
-TAPI_OPS_MAP = {}
+    def translate(self, statement: str, args):
+        """
+        Functions the same as calling __call__
+        """
+        return self(statement, args)
 
-# --- Level-0 --------------------------------------------------------------
-# absqsc
-def absqsc_oapi(x):
-    return bli_oapi("bli_absqsc", amp(x[0]), amp(x[0]))
-OAPI_OPS_MAP["FLA_Absolute_square"] = absqsc_oapi
+class ObjectAPITranslator(Translator):
+    # --- Level-0 ---
+    def FLA_Absolute_square(self, args):
+        return self._map_to_oapi(
+            "bli_absqsc",
+                amp(args[0]),
+                amp(args[0])
+        )
 
-def absqsc_tapi(x):
-    return f"PASTEMAC(ch,absqsc)( {x[0]}, {x[0]} );"
-TAPI_OPS_MAP["FLA_Absolute_square"] = absqsc_tapi
+    def FLA_Invert(self, args):
+        return self._map_to_oapi(
+            "bli_invertsc",
+                amp(args[1]),
+                amp(args[1])
+        )
 
-# invertsc
-def invertsc_oapi(x):
-    return bli_oapi("bli_invertsc", amp(x[1]), amp(x[1]))
-OAPI_OPS_MAP["FLA_Invert"] = invertsc_oapi
+    # --- Level-1 ---
+    def FLA_Dots_external(self, args):
+        # FLA_Dots_external( FLA_MINUS_ONE, a10t, a01, FLA_ONE, alpha11 );
+        return self._map_to_oapi(
+            "bli_dotxv_ex",
+                amp(args[0]),
+                amp(args[1]),
+                amp(args[2]),
+                amp(args[3]),
+                amp(args[4]),
+                "cntx",
+                "rntm"
+        )
 
-def invertsc_tapi(x):
-    return f"PASTEMAC(ch,invertsc)( {x[0].replace('FLA', 'BLIS')}, {x[1]}, {x[1]} );"
-TAPI_OPS_MAP["FLA_Invert"] = invertsc_tapi
+    def FLA_Dotcs_external(self, args):
+        # FLA_Dotcs_external( FLA_CONJUGATE, FLA_ONE, a21, a21, FLA_ONE, alpha11 );
+        # void bli_dotv( obj_t*  x, obj_t*  y, obj_t*  rho );
+        original_x = args[2].strip("t")
+        conj_x = args[2].strip("t") + "_conj"
+        return \
+            f"obj_t {conj_x};", \
+            f"bli_obj_alias_with_conj( BLIS_CONJUGATE, {amp(original_x)}, {amp(conj_x)} );", \
+            self._map_to_oapi(
+                "bli_dotxv_ex",
+                    amp(args[1]),
+                    amp(conj_x),
+                    amp(args[3]),
+                    amp(args[4]),
+                    amp(args[5]),
+                    "cntx",
+                    "rntm"
+            )
 
-# --- Level-1 -------------------------------------------------------------
-# addv
-# amaxv
-# axpbyv
-# axpyv
-# copyv
-# dots
-def dots_oapi(x):
-    # FLA_Dots_external( FLA_MINUS_ONE, a10t, a01, FLA_ONE, alpha11 );
-    return bli_oapi("bli_dotxv_ex", amp(x[0]), amp(x[1]), amp(x[2]), amp(x[3]), amp(x[4]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Dots_external"] = dots_oapi
+    def FLA_Inv_scal_external(self, args):
+        return self._map_to_oapi(
+            "bli_invscalv_ex",
+                amp(args[0]),
+                amp(args[1]),
+                "cntx",
+                "rntm"
+        )
 
-# dotv
-def dotcs_oapi(x):
-    # FLA_Dotcs_external( FLA_CONJUGATE, FLA_ONE, a21, a21, FLA_ONE, alpha11 );
-    # void bli_dotv( obj_t*  x, obj_t*  y, obj_t*  rho );
-    original_x = x[2].strip("t")
-    conj_x = x[2].strip("t") + "_conj"
-    return \
-        f"obj_t {conj_x};", \
-        f"bli_obj_alias_with_conj( BLIS_CONJUGATE, {amp(original_x)}, {amp(conj_x)} );", \
-        bli_oapi("bli_dotxv_ex", amp(x[1]), amp(conj_x), amp(x[3]), amp(x[4]), amp(x[5]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Dotcs_external"] = dotcs_oapi
+    def FLA_Scal_external(self, args):
+        return self._map_to_oapi(
+            "bli_scalv_ex",
+                amp(args[0]),
+                amp(args[1]),
+                "cntx",
+                "rntm"
+        )
 
-def dotcs_tapi(x):
-    return bli_tapi("dotxv",x[0],"FLA_NO_CONJUGATE",size(x[2]),x[1],x[2],x[3],x[4],x[5],"cntx","rntm")
-TAPI_OPS_MAP["FLA_Dotcs_external"] = dotcs_tapi
+    # --- Level-2 ---
+    def FLA_Gemvc_external(self, args):
+        # FLA_Gemvc_external( FLA_NO_TRANSPOSE, FLA_CONJUGATE, FLA_ONE, A02, a12t, FLA_ONE, a01 );
+        output = (f"bli_obj_apply_trans( BLIS_TRANSPOSE, {amp(args[3]).lower()} );",) if args[0] == "FLA_NO_TRANSPOSE" else tuple()
+        
+        original_x = args[4].strip("t")
+        conj_x = args[4].strip("t") + "_conj"
 
-# dotxv
-# normfv
-# invscalv
-def invscalv_oapi(x):
-    return bli_oapi("bli_invscalv_ex", amp(x[0]), amp(x[1]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Inv_scal_external"] = invscalv_oapi
+        return output + (\
+            f"obj_t {conj_x};", \
+            f"bli_obj_alias_with_conj( BLIS_CONJUGATE, {amp(original_x)}, {amp(conj_x)} );", \
+            self._map_to_oapi(
+                "bli_gemv_ex",
+                    amp(args[2]),
+                    amp(args[3]),
+                    amp(args[4]),
+                    amp(args[5]),
+                    amp(args[6]),
+                    "cntx",
+                    "rntm"
+            )
+        )
 
-def invscalv_tapi(x):
-    return bli_tapi("invscalv", "FLA_NO_CONJUGATE", size(x[1]), x[0], x[1], "cntx", "rntm")
-TAPI_OPS_MAP["FLA_Inv_scal_external"] = invscalv_tapi
+    def FLA_Ger_external(self, args):
+        return self._map_to_oapi(
+            "bli_ger_ex",
+                *[amp(s) for s in args],
+                "cntx",
+                "rntm"
+        )
 
-# scalv
-def scalv_oapi(x):
-    return bli_oapi("bli_scalv_ex", amp(x[0]), amp(x[1]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Scal_external"] = scalv_oapi
+    def FLA_Her_internal(self, args):
+        return self._map_to_oapi(
+            "bli_her_ex",
+                amp(args[1]),
+                amp(args[2]),
+                amp(args[3]),
+                "cntx",
+                "rntm"
+        )
 
-def scalv_tapi(x):
-    return bli_tapi("scalv","FLA_NO_CONJUGATE", size(x[1]), x[0], x[1], "cntx", "rntm")
-TAPI_OPS_MAP["FLA_Scal_external"] = scalv_tapi
+    def FLA_Trmv_external(self, args):
+        return self._map_to_oapi(
+            "bli_trmv_ex",
+                "&FLA_ONE",
+                amp(args[3]),
+                amp(args[4]),
+                "cntx", 
+                "rntm"
+        )
 
-# scal2v
-# setv
-# subv
-# xpbyv
+    def FLA_Trsv_external(self, args):
+        return self._map_to_oapi(
+            "bli_trsv_ex",
+                "&FLA_ONE",
+                amp(args[3]),
+                amp(args[4]),
+                "cntx",
+                "rntm"
+        )
 
-# addm
-# axpym
-# copym
-# normfm
-# invscalm
-# scalm
-# scal2m
-# setm
-# subm
-# xpbym
+    # --- Level-3 ---
+    def FLA_Gemm_internal(self, args):
+        return self._map_to_oapi(
+            "bli_gemm_ex",
+                amp(args[2]),
+                amp(args[3]),
+                amp(args[4]),
+                amp(args[5]),
+                amp(args[6]),
+                "cntx",
+                "rntm"
+        )
 
+    def FLA_Herk_internal(self, args):
+        return self._map_to_oapi(
+            "bli_herk_ex",
+                amp(args[2]),
+                amp(args[3]),
+                amp(args[4]),
+                amp(args[5]),
+                "cntx",
+                "rntm"
+        )
 
-# --- Level-2 --------------------------------------------------------------
-# gemv
-def gemvc_oapi(x):
-    # FLA_Gemvc_external( FLA_NO_TRANSPOSE, FLA_CONJUGATE, FLA_ONE, A02, a12t, FLA_ONE, a01 );
-    output = (f"bli_obj_apply_trans( BLIS_TRANSPOSE, {amp(x[3]).lower()} );",) if x[0] == "FLA_NO_TRANSPOSE" else tuple()
+    def FLA_Trmm_internal(self, args):
+        return self._map_to_oapi(
+            "bli_trmm_ex",
+                args[0],
+                amp(args[4]),
+                amp(args[5]),
+                amp(args[6]),
+                "cntx",
+                "rntm"
+        )
+
+    def FLA_Trsm_internal(self, args):
+        return self._map_to_oapi(
+            "bli_trsm_ex",
+                args[0],
+                amp(args[4]),
+                amp(args[5]),
+                amp(args[6]),
+                "cntx",
+                "rntm"
+        )
+
+    # --- Level-4 ---
+    def FLA_Trinv_internal(self, args):
+        return self._map_to_oapi(
+            "bli_trinv_int",
+                amp(args[2]),
+                "cntx",
+                "rntm",
+                "bli_cntl_sub_node( cntl )"
+        )
+
+    def FLA_Ttmm_internal(self, args):
+        return self._map_to_oapi(
+            "bli_ttmm_int",
+                amp(args[1]),
+                "cntx",
+                "rntm",
+                "bli_cntl_sub_node( cntl )"
+        )
+
+    def _map_to_oapi(self, name, *params) -> str:
+        params = [ x.lower().strip().strip('t') if "FLA" not in x else x.replace("FLA", "BLIS").upper() for x in params ]
+        return name + "( " + ", ".join(params) + " );"
+
+class TypedAPITranslator(Translator):
+    # --- Level-0 ---
+    def FLA_Absolute_square(self, args):
+        return f"PASTEMAC(ch,absqsc)( {args[0]}, {args[0]} );"
     
-    original_x = x[4].strip("t")
-    conj_x = x[4].strip("t") + "_conj"
+    def FLA_Invert(self, args):
+        return f"PASTEMAC(ch,invertsc)( {args[0].replace('FLA', 'BLIS')}, {args[1]}, {args[1]} );"
 
-    return output + (\
-        f"obj_t {conj_x};", \
-        f"bli_obj_alias_with_conj( BLIS_CONJUGATE, {amp(original_x)}, {amp(conj_x)} );", \
-        bli_oapi("bli_gemv_ex", amp(x[2]),amp(x[3]),amp(x[4]),amp(x[5]),amp(x[6]), "cntx", "rntm"))
-OAPI_OPS_MAP["FLA_Gemvc_external"] = gemvc_oapi
+    # --- Level-1 ---
+    def FLA_Dotcs_external(self, args):
+        return self._map_to_tapi("dotxv",args[0],"FLA_NO_CONJUGATE",size(args[2]),args[1],args[2],args[3],args[4],args[5],"cntx","rntm")
 
-def gemvc_tapi(x):
-    return bli_tapi("gemv", *x[0:2], size(x[3]), size(x[4]), *x[2:], "cntx", "rntm")
-TAPI_OPS_MAP["FLA_Gemvc_external"] = gemvc_tapi
+    def FLA_Inv_scal_external(self, args):
+        return self._map_to_tapi("invscalv", "FLA_NO_CONJUGATE", size(args[1]), args[0], args[1], "cntx", "rntm")
 
-# ger
-def ger_oapi(x):
-    return bli_oapi("bli_ger_ex", *[amp(s) for s in x], "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Ger_external"] = ger_oapi
+    def FLA_Scal_external(self, args):
+        return self._map_to_tapi("scalv","FLA_NO_CONJUGATE", size(args[1]), args[0], args[1], "cntx", "rntm")
 
-def ger_tapi(x):
-    return bli_tapi("ger", "FLA_NO_CONJUGATE", "FLA_NO_CONJUGATE", size(x[1]), size(x[2]), amp(x[0]), x[1], x[2], x[3], "cntx", "rntm")
-TAPI_OPS_MAP["FLA_Ger_external"] = ger_tapi
+    # --- Level-2 ---
+    def FLA_Gemvc_external(self, args):
+        return self._map_to_tapi("gemv", *args[0:2], size(args[3]), size(args[4]), *args[2:], "cntx", "rntm")
 
-# hemv
-# her
-def her_oapi(x):
-    return bli_oapi("bli_her_ex", amp(x[1]), amp(x[2]), amp(x[3]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Her_internal"] = her_oapi
+    def FLA_Ger_external(self, args):
+        return self._map_to_tapi("ger", "FLA_NO_CONJUGATE", "FLA_NO_CONJUGATE", size(args[1]), size(args[2]), amp(args[0]), args[1], args[2], args[3], "cntx", "rntm")
 
-# her2
-# symv
-# syr
-# syr2
-# trmv
-def trmv_oapi(x):
-    return bli_oapi("bli_trmv_ex", "&FLA_ONE", amp(x[3]), amp(x[4]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Trmv_external"] = trmv_oapi
+    def FLA_Trmv_external(self, args):
+        return self._map_to_tapi("trmv",*args[0:3], size(args[3]), amp("FLA_ONE"), *args[3:], "cntx", "rntm")
 
-def trmv_tapi(x):
-    return bli_tapi("trmv",*x[0:3], size(x[3]), amp("FLA_ONE"), *x[3:], "cntx", "rntm")
-TAPI_OPS_MAP["FLA_Trmv_external"] = trmv_tapi
+    def FLA_Trsv_external(self, args):
+        return self._map_to_tapi("trsv", "FLA_NO_CONJUGATE", size(args[1]), args[0], args[1], "cntx", "rntm")
 
-# trsv
-def trsv_oapi(x):
-    return bli_oapi("bli_trsv_ex", "&FLA_ONE", amp(x[3]), amp(x[4]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Trsv_external"] = trsv_oapi
+    # --- Level-3 ---
 
-def trsv_tapi(x):
-    # void bli_?trsv (uploa, transa, diaga, m, alpha, a, inc_t rsa, inc_t csa, y, inc_t incy );
-    return bli_tapi("trsv", x[0], x[1], x[2], size(x[3]), "&FLA_ONE", x[3], x[4], "cntx", "rntm")
-TAPI_OPS_MAP["FLA_Trsv_external"] = trsv_tapi
+    # --- Level-4 ---
 
-# --- Level-3 --------------------------------------------------------------
-# gemm
-def gemm_oapi(x):
-    return bli_oapi("bli_gemm_ex", amp(x[2]), amp(x[3]), amp(x[4]), amp(x[5]), amp(x[6]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Gemm_internal"] = gemm_oapi
+    # --- Helper Methods ---
 
-# gemmt
-# hemm
-# herk
-def herk_oapi(x):
-    return bli_oapi("bli_herk_ex", amp(x[2]), amp(x[3]), amp(x[4]), amp(x[5]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Herk_internal"] = herk_oapi
+    def _map_to_tapi(self, name, *params) -> str:
+        struct_t_mapping = {
+            # side
+            "FLA_LEFT": "BLIS_LEFT",
+            "FLA_RIGHT": "BLIS_RIGHT",
+            # uplo
+            "FLA_LOWER_TRIANGULAR": "BLIS_LOWER",
+            "FLA_UPPER_TRIANGULAR": "BLIS_UPPER",
+            # trans
+            "FLA_NO_TRANSPOSE": "BLIS_NO_TRANSPOSE",
+            "FLA_TRANSPOSE": "BLIS_TRANSPOSE",
+            "FLA_CONJ_NO_TRANSPOSE": "BLIS_CONJ_NO_TRANSPOSE",
+            "FLA_CONJ_TRANSPOSE": "BLIS_CONJ_TRANSPOSE",
+            # conj
+            "FLA_NO_CONJUGATE": "BLIS_NO_CONJUGATE",
+            "FLA_CONJUGATE": "BLIS_CONJUGATE",
+            # diag
+            "FLA_NONUNIT_DIAG": "BLIS_NONUNIT_DIAG",
+            "FLA_UNIT_DIAG": "BLIS_UNIT_DIAG",
+            # "FLA_ZERO_DIAG": "", # no translation for this in BLIS...
+        }
 
-# her2k
-# symm
-# syrk
-# syr2k
-# trmm
-def trmm_oapi(x):
-    return bli_oapi("bli_trmm_ex", x[0], amp(x[4]), amp(x[5]), amp(x[6]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Trmm_internal"] = trmm_oapi
+        parameter_mapping = {
+            "a00": "a00, rs_a, cs_a",
+            "a01": "a01, rs_a",
+            "a02": "a02, rs_a, cs_a",
+            "a10": "a10, cs_a",
+            "alpha11": "alpha11",
+            "a12": "a12, cs_a",
+            "a20": "a20, rs_a, cs_a",
+            "a21": "a21, rs_a",
+            "a22": "a22, rs_a, cs_a",
+            "mn_behind": "mn_behind"
+        }
 
-# trmm3
-# trsm
-def trsm_oapi(x):
-    return bli_oapi("bli_trsm_ex", x[0], amp(x[4]), amp(x[5]), amp(x[6]), "cntx", "rntm")
-OAPI_OPS_MAP["FLA_Trsm_internal"] = trsm_oapi
+        size_mapping = {
+            "size_a00": "mn_behind",
+            "size_a01": "mn_behind",
+            "size_a02": "mn_behind",
+            "size_a10": "mn_behind",
+            "size_a12": "mn_ahead",
+            "size_a20": "mn_ahead",
+            "size_a21": "mn_ahead",
+            "size_a22": "mn_ahead",
+        }
 
-# --- Level-4 --------------------------------------------------------------
-# chol
-# trinv
-def trinv_oapi(x):
-    return bli_oapi("bli_trinv_int", amp(x[2]), "cntx", "rntm", "bli_cntl_sub_node( cntl )" )
-OAPI_OPS_MAP["FLA_Trinv_internal"] = trinv_oapi
+        constants_mapping = {
+            "FLA_ONE": "&one",
+            "&FLA_ONE": "&one",
+            "FLA_MINUS_ONE": "&minus_one",
+            "&FLA_MINUS_ONE": "&minus_one",
+        }
 
-# ttmm
-def ttmm_oapi(x):
-    return bli_oapi("bli_ttmm_int", amp(x[1]), "cntx", "rntm", "bli_cntl_sub_node( cntl )" )
-OAPI_OPS_MAP["FLA_Ttmm_internal"] = ttmm_oapi
+        new_params = []
 
-# OAPI_OPS_MAP = {
-#     "FLA_Absolute_square": absqsc_oapi,
-#     "FLA_Invert": invertsc_oapi,
-#     "FLA_Dotcs_external": dotcs_oapi,
-#     "FLA_Inv_scal_external": invscalv_oapi,
-#     "FLA_Scal_external": scalv_oapi,
+        for param in params:
+            if param in struct_t_mapping:
+                new_params += ["  " + struct_t_mapping[param] + ","]
+            if param in constants_mapping:
+                new_params += ["  " + constants_mapping[param] + ","]
+            elif "FLA" in param:
+                new_params += ["  " + param.replace("FLA", "BLIS") + ","]
+            elif param.startswith("size"):
+                param = param.lower().strip().strip('t')
+                new_params += ["  " + size_mapping[param] + ","]
+            elif param not in ["rntm", "cntx"]:
+                param = param.lower().strip().strip('t')
+                new_params += ["  " + parameter_mapping[param] + ","]
+            else:
+                new_params += ["  " + param.lower().strip() + ","]
 
-#     "FLA_Trmm_internal": trmm_oapi,
-#     "FLA_Trsm_internal": trsm_oapi,
-#     "FLA_Trmv_external": trmv_oapi,
-#     "FLA_Trsv_external": trsv_oapi,
-#     "FLA_Trinv_internal": trinv_oapi,
-#     "FLA_Ttmm_internal": ttmm_oapi,
-#     "FLA_Herk_internal": herk_oapi,
-#     "FLA_Her_internal": her_oapi,
-#     "FLA_Herc_internal": her_oapi,
-#     "FLA_Ger_external": ger_oapi,
-#     "FLA_Gemm_internal": gemm_oapi,
-    
-#     # "FLA_Gemvc_external": gemvc_oapi,
-#     "FLA_Her_external": her_oapi
-# }
-
-# TAPI_OPS_MAP = {
-#     "FLA_Trmv_external": trmv_tapi,
-#     "FLA_Trsv_external": trsv_tapi,
-#     "FLA_Scal_external": scalv_tapi,
-#     "FLA_Inv_scal_external": invscalv_tapi,
-#     "FLA_Invert": invertsc_tapi,
-#     "FLA_Ger_external": ger_tapi
-# }
-
+        # return f"PASTEMAC2(ch,{name},BLIS_TAPI_EX_SUF) ( " + ", ".join(new_params) + " );"
+        return f"PASTEMAC2(ch,{name},BLIS_TAPI_EX_SUF)", "(", *new_params, ");"

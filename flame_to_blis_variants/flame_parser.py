@@ -1,63 +1,18 @@
 from re import split
-from func_mappings import *
-
-def translate_flame_to_blis(ftype, flame_statements):
-    converter_func = translate_flame_to_blis_oapi if ftype != "opt" else translate_flame_to_blis_tapi
-
-    ops = []
-    for line in flame_statements:
-        if line.startswith("FLA"):
-            op = converter_func(line)
-
-            # unpack operation if a function needs multiple lines
-            if isinstance(op, tuple):
-                ops += [*op]
-            else:
-                ops += [op]
-                
-        elif line.startswith("//") and ftype == "opt":
-            ops += [line.replace("//", "/*") + " */"]
-        else:
-            ops += [line]
-
-    return ops
-
-def translate_flame_to_blis_oapi (update_statement):
-    func_name, args = get_func_name_from_update(update_statement), get_func_args_from_update(update_statement)
-
-    try:
-        return OAPI_OPS_MAP[func_name](args)
-    except KeyError:
-        print("Unknown operation", func_name)
-        print("Try implementing this operation in func_mappings.py. Will mark as a TODO string")
-    except Exception as e:
-        print(e)
-        raise Exception("An unknown error occurred while translating \"", update_statement, "\".")
-
-    return f"/* TODO: {update_statement} */"
-
-
-def translate_flame_to_blis_tapi (update_statement):
-    func_name, args = get_func_name_from_update(update_statement), get_func_args_from_update(update_statement)
-
-    try:
-        return TAPI_OPS_MAP[func_name](args)
-    except KeyError as k:
-        print("Unknown operation", k)
-        print("Try implementing this operation in func_mappings.py. Will mark as a TODO string")
-    except Exception as e:
-        print(e)
-        raise Exception("An unknown error occurred while translating \"", update_statement, "\".")
-
-    return f"/* TODO: {update_statement} */"
+from func_mappings import Translator, ObjectAPITranslator, TypedAPITranslator
 
 def translate_flame_updates_to_blis(ftype, file_input):
-    # get the middle part of the input
+    # get the middle part of the input where the update statements are
     file_input = split("/\*-+\*/", file_input)
     if len(file_input) != 3:
         return None
     file_input = file_input[1].strip()
 
+    update_statements = condense_func_calls(file_input)
+
+    return translate_update_statements(ftype, update_statements)
+
+def condense_func_calls(file_input):
     update_statements = []
     flame_statements = file_input.split("\n")
     i = 0
@@ -72,8 +27,40 @@ def translate_flame_updates_to_blis(ftype, file_input):
                 
         update_statements += [new_statement]
         i += 1
+    return update_statements
 
-    return translate_flame_to_blis(ftype, update_statements)
+def translate_update_statements(ftype, flame_statements):
+    translator = ObjectAPITranslator() if ftype != "opt" else TypedAPITranslator()
+    ops = []
+    for line in flame_statements:
+        if line.startswith("FLA"):
+            op = translate_update_statement(translator, line)
+
+            # unpack operation if a function needs multiple lines
+            if isinstance(op, tuple):
+                ops += [*op]
+            else:
+                ops += [op]
+
+        elif line.startswith("//") and ftype == "opt":
+            ops += [line.replace("//", "/*") + " */"]
+        else:
+            ops += [line]
+
+    return ops
+
+def translate_update_statement(translator : Translator, update_statement):
+    func_name, args = get_func_name_from_update(update_statement), get_func_args_from_update(update_statement)
+    try:
+        return translator.translate(func_name, args)
+    except KeyError:
+        print("Unknown operation \"", func_name, "\"")
+        print("Try implementing this operation in func_mappings.py. Will mark as a TODO string")
+    except Exception as e:
+        print(e)
+        raise Exception(f"An unknown error occurred while translating \"{update_statement}\".")
+    return f"/* TODO: {update_statement} */"
+
 
 def get_op_func_args(file_input):
     # get arguments from FLAME code
